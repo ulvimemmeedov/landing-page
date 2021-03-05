@@ -1,7 +1,7 @@
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config()
   }
-  
+  const PORT = 5000
   const express = require('express')
   const app = express()
   const bcrypt = require('bcrypt')
@@ -100,4 +100,4 @@ if (process.env.NODE_ENV !== 'production') {
     next()
   }
   
-  app.listen(2000)
+  app.listen(PORT)
