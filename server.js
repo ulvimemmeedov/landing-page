@@ -1,7 +1,3 @@
-if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config()
-  }
-  const PORT = 5000
   const express = require('express')
   const app = express()
   const bcrypt = require('bcrypt')
@@ -9,13 +5,19 @@ if (process.env.NODE_ENV !== 'production') {
   const flash = require('express-flash')
   const session = require('express-session')
   const methodOverride = require('method-override')
-  
+  const dotenv = require('dotenv')
+  const conn = require('./database/database')
   const initializePassport = require('./passport-config')
-  initializePassport(
-    passport,
-    email => users.find(user => user.email === email),
-    id => users.find(user => user.id === id)
-  )
+  const { Settings } = require('./controllers/settingsController')
+  const {Projects} = require('./controllers/projectController')
+  const {Edu} = require('./controllers/eduController')
+  const {Work} = require('./controllers/workController')
+  const mongoose = require('mongoose')
+  const settModel = require('./models/settingModel')
+  const proModel = require('./models/projectModel')
+  const eduModel = require('./models/eduModel')
+  const workModel = require('./models/workModel')
+
   
   const users = [
     ulvi={
@@ -26,78 +28,92 @@ if (process.env.NODE_ENV !== 'production') {
         
     }
   ]
-  
-  
-  app.set('view-engine', 'ejs')
-  app.use(express.static(__dirname + '/views'));
+  initializePassport(
+    passport,
+    email => users.find(user => user.email === email),
+    id => users.find(user => user.id === id)
+  )
+  dotenv.config()
+  conn();
+  var settingObject =[]
+  var projectObject = []
+  var eduObject = []
+  var workObject = []
+  app.listen(process.env.PORT);
 
-  app.use(express.urlencoded({ extended: false }))
-  app.use(flash())
-  app.use(session({
-    secret: 'process.env.SESSION_SECRET',
-    resave: false,
-    saveUninitialized: false
-  }))
-  app.use(passport.initialize())
-  app.use(passport.session())
-  app.use(methodOverride('_method'))
-
-  app.get('/',(req,res)=>{
-    res.render('index.ejs')
-  })  
-  app.get('/admin', checkAuthenticated, (req, res) => {
-    res.render('admin.ejs',{ name: req.user.name})
+app.set('view-engine', 'ejs').use(express.static(__dirname + '/views'))
+  .use(express.urlencoded({ extended: false }))
+  .use(flash())
+  .use(session({secret: 'process.env.SESSION_SECRET',resave: false,saveUninitialized: false}))
+  .use(passport.initialize())
+  .use(passport.session()).use(methodOverride('_method'))
+  .post("/settings",checkAuthenticated,Settings)
+  .post("/projects",checkAuthenticated,Projects)
+  .post("/edu",checkAuthenticated,Edu)
+  .post("/work",checkAuthenticated,Work)
+  .get('/',(req,res)=>{
+    settModel.find({}).then(data =>{
+      settingObject = data;
+    })
+    proModel.find({}).then(data =>{
+      projectObject = data;
+  
+    })
+    eduModel.find({}).then(data=>{
+      eduObject = data
+    })
+    workModel.find({}).then(data=>{
+      workObject = data
+    })
+   res.render('index.ejs', {setting: settingObject, project :projectObject, edu:eduObject, work:workObject}); 
   })
-  
-  app.get('/login', checkNotAuthenticated, (req, res) => {
+  .get('/admin', checkAuthenticated, (req, res) => {
+
+    settModel.find({}).then(data =>{
+      settingObject = data;
+    })
+     proModel.find({}).then(data =>{
+      projectObject = data;
+
+    })
+    eduModel.find({}).then(data=>{
+      eduObject = data
+    })
+    workModel.find({}).then(data=>{
+      workObject = data
+    })
+      res.render('admin.ejs',{setting: settingObject, project :projectObject,  edu:eduObject, work:workObject})
+      
+  })
+  .get('/login', checkNotAuthenticated, (req, res) => {
     res.render('adminLogin.ejs')
   })
-  
-  app.post('/login', checkNotAuthenticated, passport.authenticate('local', {
+  .post('/login', checkNotAuthenticated, passport.authenticate('local', {
     successRedirect: '/admin',
     failureRedirect: '/adminLogin',
     failureFlash: true
   }))
-  
-  app.get('/register', checkNotAuthenticated, (req, res) => {
-    res.render('register.ejs')
-  })
-  
-  app.post('/register', checkNotAuthenticated, async (req, res) => {
-    try {
-      const hashedPassword = await bcrypt.hash(req.body.password, 10)
-      users.push({
-        id: Date.now().toString(),
-        name: req.body.name,
-        email: req.body.email,
-        password: hashedPassword
-      })
-      res.redirect('/login')
-    } catch {
-      res.redirect('/register')
-    }
-  })
-  
-  app.delete('/logout', (req, res) => {
+  .delete('/logout', (req, res) => {
     req.logOut()
     res.redirect('/login')
   })
-  app.get('/users',checkAuthenticated, (req,res)=>{
-      res.json(users)
-  })
+  .get('/*',(req,res)=>{
+    res.send(404)
+    })
+    
   function checkAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
       return next()
     }
   
-    res.redirect('/login')
+    res.redirect('/*')
   }
   
   function checkNotAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
-      return res.redirect('/home')
+      return res.redirect('/admin')
     }
     next()
   }
   
-  app.listen(PORT)
+  
